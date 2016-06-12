@@ -1,20 +1,20 @@
 #include <AccelStepper.h>
-#include "uStepperEncoder.h"
+//#include "uStepperEncoder.h"
 #include <ros.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Float32.h>
 #include <sensor_msgs/JointState.h>
 
-#define LIMIT 12
+#define LIMIT 10
 #define STEPS_PER_ROT 400
 #define STEPS_PER_MM 50
 #define MAX_LIMIT 480
 #define MIN_LIMIT 10
-#define MAX_SPEED 6000
+#define MAX_SPEED 3000
 #define MAX_ACCEL 8000
 
 AccelStepper stepper(1, STEP, DIR);
-uStepperEncoder encoder;
+//uStepperEncoder encoder;
 ros::NodeHandle_<ArduinoHardware, 6, 6, 150, 150> nh;
 
 std_msgs::Float32 joint_state;
@@ -51,7 +51,7 @@ void home_stepper() {
   // enable stepper
   
   // find limit
-  stepper.setAcceleration(10000 * 16);
+  
   stepper.moveTo(-240000);
   while (1) {
     stepper.run();
@@ -76,6 +76,7 @@ void home_stepper() {
     }
   }
   stepper.setCurrentPosition(0);
+  //encoder.setHome();
   stepper.setMaxSpeed(MAX_SPEED);
   stepper.setAcceleration(MAX_ACCEL);
   stepper.moveTo(MIN_LIMIT * STEPS_PER_MM);
@@ -91,15 +92,16 @@ void setup() {
   pinMode(STEP, OUTPUT);
   pinMode(DIR, OUTPUT);
   pinMode(ENA, OUTPUT);
-  //pinMode(LIMIT, INPUT_PULLUP);
+  pinMode(LIMIT, INPUT_PULLUP);
   digitalWrite(ENA, LOW);
 
   target_pos_steps = 0;
  
   stepper.setMaxSpeed(MAX_SPEED);
   stepper.setAcceleration(MAX_ACCEL);
-  //stepper.setMinPulseWidth(2);
-  //home_stepper();
+  stepper.setPinsInverted(true, true, false);
+  
+  home_stepper();
   nh.getHardware()->setBaud(250000);
   nh.initNode();
   nh.subscribe(sub);
@@ -117,17 +119,17 @@ void loop()
     digitalWrite(13, LOW);
     digitalWrite(ENA, LOW);
   }
-  float rotations = -encoder.getAngleMoved() / 360.0;
-  long encoder_steps = rotations * STEPS_PER_ROT;
+  //float rotations = encoder.getAngleMoved() / 360.0;
+  //long encoder_steps = rotations * STEPS_PER_ROT;
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis > interval) {
     previousMillis = currentMillis;
-    joint_state.data = (encoder_steps / STEPS_PER_MM) / 1000.0;
+    joint_state.data = (stepper.currentPosition() / STEPS_PER_MM) / 1000.0;
     joint_pub.publish(&joint_state);
   }
   nh.spinOnce();
   
-  stepper.setCurrentPositionOnly(encoder_steps);
+  //stepper.setCurrentPositionOnly(encoder_steps);
   stepper.run();
   //stepper.correctDeviation();
 }
