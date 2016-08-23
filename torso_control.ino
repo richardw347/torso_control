@@ -1,4 +1,4 @@
-#include <AccelStepper.h>
+#include <AccelStepperEncoder.h>
 #include <Encoder.h>
 #include <ros.h>
 #include <std_msgs/Empty.h>
@@ -23,7 +23,7 @@
 AccelStepperEncoder stepper(1, STEP, DIR);
 Encoder encoder(2, 1);
 
-ros::NodeHandle nh;
+ros::NodeHandle_<ArduinoHardware, 6, 6, 150, 150> nh;
 
 std_msgs::Float32 joint_state;
 ros::Publisher joint_pub("torso_state", &joint_state);
@@ -33,11 +33,9 @@ long interval = 50;
 long target_pos_steps;
 
 
-void command_cb( const cb1_msgs::TorsoControl& cmd_msg) {
+void command_cb( const std_msgs::Float32& cmd_msg) {
   // convert target in mm to steps
-  float target = cmd_msg.position * 1000.0; // convert to mm
-  float velocity = cmd_msg.velocity * 1000.0 * STEPS_PER_MM;
-  //float acceleration = cmd_msg.acceleration * 1000.0 * STEPS_PER_MM;
+  float target = cmd_msg.data * 1000.0; // convert to mm
 
   if (target > MAX_LIMIT) {
     target = MAX_LIMIT;
@@ -46,21 +44,16 @@ void command_cb( const cb1_msgs::TorsoControl& cmd_msg) {
     target = MIN_LIMIT;
   }
 
-  if (velocity > MAX_SPEED) {
-    velocity = MAX_SPEED;
-  }
-
   //if (acceleration > MAX_ACCEL){
   //  acceleration = MAX_ACCEL;
   //}
 
   target_pos_steps = target * STEPS_PER_MM;
   stepper.moveTo(target_pos_steps);
-  stepper.setMaxSpeed(velocity);
   //stepper.setAcceleration(acceleration);
 }
 
-ros::Subscriber<cb1_msgs::TorsoControl> home_sub("torso_cmd", command_cb);
+ros::Subscriber<std_msgs::Float32> cmd_sub("torso_cmd", command_cb);
 
 void home_stepper() {
   // enable stepper
@@ -101,7 +94,7 @@ void home_cb(const std_msgs::Empty& emp) {
   home_stepper();
 }
 
-ros::Subscriber<std_msgs::Empty> sub("torso_home", home_cb);
+ros::Subscriber<std_msgs::Empty> home_sub("torso_home", home_cb);
 
 void setup() {
   pinMode(SLEEP, OUTPUT);
@@ -124,10 +117,10 @@ void setup() {
   stepper.setAcceleration(MAX_ACCEL);
   stepper.setMinPulseWidth(2);
   home_stepper();
-
+  //nh.getHardware()->setBaud(250000);
   nh.initNode();
-  nh.subscribe(sub);
   nh.subscribe(home_sub);
+  nh.subscribe(cmd_sub);
   nh.advertise(joint_pub);
 
 
